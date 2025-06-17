@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sudoku Game</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #f7f7f7;
+    }
+    #sudoku-container {
+      position: absolute;
+      top: 50px;
+      left: 50px;
+      padding: 20px;
+      border-radius: 10px;
+      background-color: white;
+      border: 2px solid #444;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+      cursor: move;
+    }
+    .sudoku-grid {
+      display: grid;
+      grid-template-columns: repeat(9, 40px);
+      gap: 0;
+    }
+    .sudoku-cell {
+      width: 40px;
+      height: 40px;
+      text-align: center;
+      font-size: 18px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+    }
+    .sudoku-cell:focus {
+      outline: 2px solid #007bff;
+    }
+    .prefilled {
+      background-color: #eee;
+      font-weight: bold;
+    }
+    .sudoku-cell:nth-child(3n) {
+      border-right: 2px solid #000;
+    }
+    .sudoku-cell:nth-child(n+19):nth-child(-n+27),
+    .sudoku-cell:nth-child(n+46):nth-child(-n+54),
+    .sudoku-cell:nth-child(n+73):nth-child(-n+81) {
+      border-bottom: 2px solid #000;
+    }
+    .sudoku-cell:nth-child(9n+1),
+    .sudoku-cell:nth-child(9n+4),
+    .sudoku-cell:nth-child(9n+7) {
+      border-left: 2px solid #000;
+    }
+    .sudoku-cell:nth-child(-n+9) {
+      border-top: 2px solid #000;
+    }
+  </style>
+</head>
+<body>
+<div id="sudoku-container">
+  <h5>Movable Sudoku Game</h5>
+  <div class="sudoku-grid" id="sudoku-grid"></div>
+  <button class="btn btn-success mt-3" onclick="checkSolution()">Check Solution</button>
+  <button class="btn btn-primary mt-3 ms-2" onclick="showAnswer()">Show Answer</button>
+</div>
+
+<script>
+  const container = document.getElementById("sudoku-container");
+  let offsetX, offsetY, isDragging = false;
+  container.addEventListener("mousedown", (e) => {
+    isDragging = true;
+    offsetX = e.clientX - container.offsetLeft;
+    offsetY = e.clientY - container.offsetTop;
+  });
+  document.addEventListener("mousemove", (e) => {
+    if (isDragging) {
+      container.style.left = `${e.clientX - offsetX}px`;
+      container.style.top = `${e.clientY - offsetY}px`;
+    }
+  });
+  document.addEventListener("mouseup", () => { isDragging = false; });
+
+  const gridElement = document.getElementById("sudoku-grid");
+  let cells = [];
+  let fullSolution = [];
+
+  function generateEmptyGrid() {
+    gridElement.innerHTML = '';
+    cells = [];
+    for (let i = 0; i < 81; i++) {
+      const input = document.createElement("input");
+      input.type = "text";
+      input.maxLength = 1;
+      input.classList.add("form-control", "sudoku-cell");
+      input.dataset.index = i;
+      input.addEventListener("input", () => {
+        input.value = input.value.replace(/[^1-9]/g, "");
+      });
+      gridElement.appendChild(input);
+      cells.push(input);
+    }
+  }
+
+  function generatePuzzle() {
+    const board = Array(81).fill(0);
+
+    function isValid(index, num) {
+      const row = Math.floor(index / 9);
+      const col = index % 9;
+
+      for (let i = 0; i < 9; i++) {
+        if (board[row * 9 + i] === num || board[i * 9 + col] === num)
+          return false;
+      }
+
+      const startRow = Math.floor(row / 3) * 3;
+      const startCol = Math.floor(col / 3) * 3;
+      for (let i = 0; i < 3; i++) {
+        for (let j = 0; j < 3; j++) {
+          if (board[(startRow + i) * 9 + (startCol + j)] === num)
+            return false;
+        }
+      }
+      return true;
+    }
+
+    function fill(index = 0) {
+      if (index >= 81) return true;
+      const numbers = [...Array(9).keys()].map(x => x + 1).sort(() => Math.random() - 0.5);
+      for (const num of numbers) {
+        if (isValid(index, num)) {
+          board[index] = num;
+          if (fill(index + 1)) return true;
+          board[index] = 0;
+        }
+      }
+      return false;
+    }
+
+    fill();
+    fullSolution = [...board];
+
+    const toHide = 81 - 35;
+    const hideIndices = [...Array(81).keys()].sort(() => Math.random() - 0.5).slice(0, toHide);
+    for (let i = 0; i < 81; i++) {
+      if (hideIndices.includes(i)) {
+        cells[i].value = '';
+        cells[i].disabled = false;
+        cells[i].classList.remove("prefilled");
+      } else {
+        cells[i].value = board[i];
+        cells[i].disabled = true;
+        cells[i].classList.add("prefilled");
+      }
+    }
+  }
+
+  function showAnswer() {
+    for (let i = 0; i < 81; i++) {
+      cells[i].value = fullSolution[i];
+      cells[i].disabled = true;
+      cells[i].classList.add("prefilled");
+    }
+  }
+
+  function checkSolution() {
+    let solved = true;
+    for (let r = 0; r < 9; r++) {
+      let row = new Set();
+      let col = new Set();
+      let box = new Set();
+      for (let c = 0; c < 9; c++) {
+        const rowVal = cells[r * 9 + c].value;
+        const colVal = cells[c * 9 + r].value;
+        const boxIndex = Math.floor(r / 3) * 27 + Math.floor(c / 3) * 3 + (r % 3) * 9 + (c % 3);
+        const boxVal = cells[boxIndex].value;
+        if (rowVal === '' || colVal === '' || boxVal === '' ||
+            row.has(rowVal) || col.has(colVal) || box.has(boxVal)) {
+          solved = false;
+          break;
+        }
+        row.add(rowVal);
+        col.add(colVal);
+        box.add(boxVal);
+      }
+    }
+    alert(solved ? "✅ Correct Solution!" : "❌ Incorrect. Try again.");
+  }
+
+  generateEmptyGrid();
+  generatePuzzle();
+</script>
+</body>
+</html>
